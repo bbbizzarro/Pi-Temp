@@ -44,29 +44,54 @@ The user can explore historical data to Plotly for visualisation and processing.
  // 10. END
 '''
 
+############################################################
+#### MISC ##################################################
+# uses cron which is a scheduler on linux systems
+# i.e. 10 * * * * /usr/bin/php /www/virtual/username/cron.php > /dev/null 2>&1
+# 10 * * * * = time, and the rest is a command as it would be entered in terminal
+
+############################################################
+#### IMPORTS ###############################################
+
+# Flask is a simple webserver module
+# render_template = used to show HTML pages 
 from flask import Flask, request, render_template
+
+# time, datetime, and arrow are modules for date and time info
 import time
 import datetime
 import arrow
 
+
+
+############################################################
+#### WEB SERVER ############################################
+
 app = Flask(__name__)
 app.debug = True # Make this False if you are no longer debugging
 
+# place holder
 @app.route("/")
 def hello():
     return "Hello World!"
 
+#### page for current data #################################
 @app.route("/lab_temp")
 def lab_temp():
 	import sys
+        # Adafruit_DHT interacts directly with sensor 
 	import Adafruit_DHT
+        # read meteorological data
 	humidity, temperature = Adafruit_DHT.read_retry(Adafruit_DHT.AM2302, 17)
+        # Faharenheit conversion
 	temperature = temperature * 9/5.0 + 32
+        # run web page if everything works out, run an error page if it does not
 	if humidity is not None and temperature is not None:
 		return render_template("lab_temp.html",temp=temperature,hum=humidity)
 	else:
 		return render_template("no_sensor.html")
 
+#### web page for old data #################################
 @app.route("/lab_env_db", methods=['GET'])  #Add date limits in the URL #Arguments: from=2015-03-04&to=2015-03-05
 def lab_env_db():
 	temperatures, humidities, timezone, from_date_str, to_date_str = get_records()
@@ -76,7 +101,6 @@ def lab_env_db():
 	time_adjusted_humidities   = []
 	for record in temperatures:
 		local_timedate = arrow.get(record[0], "YYYY-MM-DD HH:mm").to(timezone)
-		time_adjusted_temperatures.append([local_timedate.format('YYYY-MM-DD HH:mm'), round(record[2],2)])
 
 	for record in humidities:
 		local_timedate = arrow.get(record[0], "YYYY-MM-DD HH:mm").to(timezone)
@@ -93,6 +117,8 @@ def lab_env_db():
 												query_string	= request.query_string, #This query string is used
 																						#by the Plotly link
 												hum_items 		= len(humidities))
+############################################################
+#### DATABASE ##############################################
 
 def get_records():
 	import sqlite3
@@ -144,6 +170,9 @@ def get_records():
 	conn.close()
 
 	return [temperatures, humidities, timezone, from_date_str, to_date_str]
+
+############################################################
+#### GRAPHING ##############################################
 
 @app.route("/to_plotly", methods=['GET'])  #This method will send the data to ploty.
 def to_plotly():
